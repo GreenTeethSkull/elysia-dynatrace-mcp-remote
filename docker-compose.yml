@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine  # Use Dockerfile for distroless (smaller), Dockerfile.alpine for healthcheck support
+    container_name: elysia-dynatrace-mcp-remote
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - DT_ENVIRONMENT=${DT_ENVIRONMENT}
+      - DT_PLATFORM_TOKEN=${DT_PLATFORM_TOKEN}
+      - DT_GRAIL_QUERY_BUDGET_GB=${DT_GRAIL_QUERY_BUDGET_GB:-1000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
