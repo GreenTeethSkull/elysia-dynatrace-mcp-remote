@@ -182,6 +182,13 @@ docker buildx build \
   --push .
 ```
 
+# Build y push para ambas arquitecturas con usuario
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t greenteethskull/elysia-dynatrace-mcp-remote:latest \
+  --push .
+```
+
 ### Pull de la imagen
 
 ```bash
