@@ -19,7 +19,7 @@ export const getApplicationMetricsAnnotations = {
 };
 
 export const getApplicationMetricsDescription =
-  "Retrieves application performance metrics from Dynatrace GRAIL including availability, latency, MTTR, errors, request volumes, weighted availability, and weighted latency. Use this tool to get a comprehensive view of application health and performance.";
+  "Retrieves application performance metrics from Dynatrace GRAIL including availability (%), latency(ms), MTTR(min), errors, request volumes, weighted availability(%), and weighted latency(ms). Use this tool to get a comprehensive view of application health and performance.";
 
 export async function handleGetApplicationMetrics(
   client: DynatraceClient,
