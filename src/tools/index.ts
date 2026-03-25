@@ -72,6 +72,12 @@ import {
   listExceptionsDescription,
   handleListExceptions,
 } from "./list-exceptions";
+import {
+  getApplicationMetricsSchema,
+  getApplicationMetricsAnnotations,
+  getApplicationMetricsDescription,
+  handleGetApplicationMetrics,
+} from "./application-metrics";
 
 // Rate limiting state
 let toolCallTimestamps: number[] = [];
@@ -266,5 +272,16 @@ export function registerAllTools(
     ),
   );
 
-  console.error(`Registered 11 Dynatrace MCP tools.`);
+  // get_application_metrics
+  server.tool(
+    "get_application_metrics",
+    getApplicationMetricsDescription,
+    getApplicationMetricsSchema,
+    getApplicationMetricsAnnotations,
+    createToolHandler("get_application_metrics", (args) =>
+      handleGetApplicationMetrics(client, args, grailBudgetGB),
+    ),
+  );
+
+  console.error(`Registered 12 Dynatrace MCP tools.`);
 }
