@@ -3,6 +3,7 @@ import type { DynatraceClient } from "../services/dynatrace-client";
 import {
   verifyDqlStatement as verifyDql,
   executeDql,
+  type FilterSegment,
 } from "../services/dql-engine";
 
 // ── verify_dql ──
@@ -62,6 +63,10 @@ export const executeDqlSchema = {
     .optional()
     .default(1)
     .describe("Maximum size of the returned records in MB (default: 1MB)"),
+  segmentId: z
+    .string()
+    .optional()
+    .describe("Optional Dynatrace segment ID to filter query results (e.g., 'tinjgDw6RfO')"),
 };
 
 export const executeDqlAnnotations = {
@@ -79,18 +84,30 @@ export async function handleExecuteDql(
     dqlStatement: string;
     recordLimit: number;
     recordSizeLimitMB: number;
+    segmentId?: string;
   },
   grailBudgetGB: number,
 ): Promise<string> {
-  const { dqlStatement, recordLimit = 100, recordSizeLimitMB = 1 } = args;
+  const { dqlStatement, recordLimit = 100, recordSizeLimitMB = 1, segmentId } = args;
+
+  const requestPayload: {
+    query: string;
+    maxResultRecords: number;
+    maxResultBytes: number;
+    filterSegments?: FilterSegment[];
+  } = {
+    query: dqlStatement,
+    maxResultRecords: recordLimit,
+    maxResultBytes: recordSizeLimitMB * 1024 * 1024,
+  };
+
+  if (segmentId) {
+    requestPayload.filterSegments = [{ id: segmentId, variables: [] }];
+  }
 
   const response = await executeDql(
     client,
-    {
-      query: dqlStatement,
-      maxResultRecords: recordLimit,
-      maxResultBytes: recordSizeLimitMB * 1024 * 1024,
-    },
+    requestPayload,
     grailBudgetGB,
   );
 
