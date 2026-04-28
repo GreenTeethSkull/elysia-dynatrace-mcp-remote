@@ -37,7 +37,7 @@ export async function handleListApisSummary(
 
     // Build optional app filter
     const appFilterClause = appFilter
-        ? `contains(azuremngm.prod.apiid,"${appFilter}",caseSensitive:false) AND `
+        ? `contains(azuremngm.prod.rh.aplicationid,"${appFilter}",caseSensitive:false) AND `
         : "";
 
     const summaryQuery = `timeseries {
