@@ -1,29 +1,113 @@
-type LogLevel = "debug" | "info" | "warn" | "error";
+/**
+ * Structured JSON logger for Application Insights via stderr.
+ *
+ * App Service Diagnostic Settings capture stderr as AppServiceConsoleLogs.
+ * Each log entry is a JSON line with:
+ *  - timestamp: ISO 8601
+ *  - level: info | warn | error
+ *  - category: functional area (mcp, tool, dql, http, budget, ratelimit, startup)
+ *  - message: human-readable summary
+ *  - operation: name of the MCP tool or HTTP method+path
+ *  - durationMs: elapsed time for the operation
+ *  - status: success | error | rate_limited
+ *  - details: free-form metadata (args summary, error message, scanned bytes, etc.)
+ */
 
-const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
+export type LogCategory =
+  | "startup"
+  | "mcp"
+  | "tool"
+  | "dql"
+  | "http"
+  | "budget"
+  | "ratelimit";
+
+export type OperationStatus =
+  | "success"
+  | "error"
+  | "rate_limited"
+  | "budget_exceeded";
+
+export interface LogEntry {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  category: LogCategory;
+  message: string;
+  operation?: string;
+  durationMs?: number;
+  status?: OperationStatus;
+  details?: Record<string, unknown>;
+}
+
+function emit(entry: LogEntry): void {
+  // All logging goes to stderr to avoid interfering with MCP protocol on stdout
+  console.error(JSON.stringify(entry));
+}
+
+export const logger = {
+  info(
+    category: LogCategory,
+    message: string,
+    options?: {
+      operation?: string;
+      durationMs?: number;
+      status?: OperationStatus;
+      details?: Record<string, unknown>;
+    },
+  ): void {
+    emit({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      category,
+      message,
+      ...options,
+    });
+  },
+
+  warn(
+    category: LogCategory,
+    message: string,
+    options?: {
+      operation?: string;
+      durationMs?: number;
+      status?: OperationStatus;
+      details?: Record<string, unknown>;
+    },
+  ): void {
+    emit({
+      timestamp: new Date().toISOString(),
+      level: "warn",
+      category,
+      message,
+      ...options,
+    });
+  },
+
+  error(
+    category: LogCategory,
+    message: string,
+    options?: {
+      operation?: string;
+      durationMs?: number;
+      status?: OperationStatus;
+      details?: Record<string, unknown>;
+    },
+  ): void {
+    emit({
+      timestamp: new Date().toISOString(),
+      level: "error",
+      category,
+      message,
+      ...options,
+    });
+  },
 };
 
-const currentLevel = (process.env.LOG_LEVEL || "info") as LogLevel;
-
+// Keep old `log` export for backward compatibility (used by server.ts onRequest)
 export function log(
-  level: LogLevel,
+  level: "debug" | "info" | "warn" | "error",
   message: string,
   data?: Record<string, unknown>,
 ): void {
-  if (LOG_LEVELS[level] < LOG_LEVELS[currentLevel]) return;
-
-  const entry = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-    ...data,
-  };
-
-  // MCP servers MUST NOT write to stdout (reserved for protocol messages)
-  // All logging goes to stderr
-  console.error(JSON.stringify(entry));
+  logger.info("mcp", message, { details: data });
 }

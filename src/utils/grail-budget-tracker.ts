@@ -2,6 +2,8 @@
  * Grail Budget Tracker - tracks and limits bytes scanned by Grail queries.
  */
 
+import { logger } from "../services/logger";
+
 export interface GrailBudgetState {
   totalBytesScanned: number;
   budgetLimitBytes: number;
@@ -23,6 +25,12 @@ class GrailBudgetTrackerImpl {
     this._budgetLimitBytes = this._unlimited
       ? Number.POSITIVE_INFINITY
       : budgetLimitGB * 1000 * 1000 * 1000;
+
+    logger.info("budget", `Grail budget tracker initialized`, {
+      details: {
+        budgetLimitGB: this._unlimited ? "unlimited" : budgetLimitGB,
+      },
+    });
   }
 
   get isBudgetExceeded(): boolean {
@@ -33,7 +41,37 @@ class GrailBudgetTrackerImpl {
 
   addBytesScanned(bytesScanned: number): GrailBudgetState {
     this._totalBytesScanned += bytesScanned;
-    return this.getState();
+
+    const state = this.getState();
+
+    if (!this._unlimited) {
+      const usagePct = (
+        (this._totalBytesScanned / this._budgetLimitBytes) *
+        100
+      ).toFixed(1);
+
+      if (this.isBudgetExceeded) {
+        logger.warn("budget", `Grail budget exceeded`, {
+          status: "budget_exceeded",
+          details: {
+            totalScannedGB: (this._totalBytesScanned / 1_000_000_000).toFixed(2),
+            budgetLimitGB: this._budgetLimitGB,
+            usagePct: `${usagePct}%`,
+          },
+        });
+      } else if (parseFloat(usagePct) >= 80) {
+        logger.warn("budget", `Grail budget usage warning`, {
+          details: {
+            totalScannedGB: (this._totalBytesScanned / 1_000_000_000).toFixed(2),
+            budgetLimitGB: this._budgetLimitGB,
+            remainingGB: state.remainingBudgetGB.toFixed(2),
+            usagePct: `${usagePct}%`,
+          },
+        });
+      }
+    }
+
+    return state;
   }
 
   getState(): GrailBudgetState {
@@ -53,6 +91,11 @@ class GrailBudgetTrackerImpl {
   }
 
   reset(): void {
+    logger.info("budget", "Grail budget tracker reset", {
+      details: {
+        previousTotalScannedGB: (this._totalBytesScanned / 1_000_000_000).toFixed(2),
+      },
+    });
     this._totalBytesScanned = 0;
   }
 }

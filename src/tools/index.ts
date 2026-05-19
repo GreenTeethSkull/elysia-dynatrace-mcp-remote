@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { DynatraceClient } from "../services/dynatrace-client";
 import { DynatraceApiError } from "../services/dynatrace-client";
 import { RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW_MS } from "../constants";
+import { logger } from "../services/logger";
 
 // Tool imports
 import {
@@ -83,6 +84,24 @@ import {
 let toolCallTimestamps: number[] = [];
 
 /**
+ * Sanitize args for logging: redact sensitive fields, truncate long strings.
+ */
+function sanitizeArgsForLogging(args: unknown): Record<string, unknown> {
+  if (!args || typeof args !== "object") return {};
+  const safe: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args as Record<string, unknown>)) {
+    if (k.toLowerCase().includes("token") || k.toLowerCase().includes("secret")) {
+      safe[k] = "[REDACTED]";
+    } else if (typeof v === "string" && v.length > 200) {
+      safe[k] = v.slice(0, 200) + "...";
+    } else {
+      safe[k] = v;
+    }
+  }
+  return safe;
+}
+
+/**
  * Wrapper that adds rate limiting, error handling, and response formatting to each tool.
  */
 function createToolHandler(
@@ -97,11 +116,16 @@ function createToolHandler(
     toolCallTimestamps = toolCallTimestamps.filter((ts) => ts > windowStart);
 
     if (toolCallTimestamps.length >= RATE_LIMIT_MAX_CALLS) {
+      logger.warn("ratelimit", `Rate limit exceeded for tool`, {
+        operation: name,
+        status: "rate_limited",
+        details: { maxCalls: RATE_LIMIT_MAX_CALLS, windowMs: RATE_LIMIT_WINDOW_MS },
+      });
       return {
         content: [
           {
             type: "text",
-            text: "Rate limit exceeded: Maximum 5 tool calls per 20 seconds. Please try again later.",
+            text: "Rate limit exceeded: Maximum 5 tool calls per 60 seconds. Please try again later.",
           },
         ],
         isError: true,
@@ -110,23 +134,47 @@ function createToolHandler(
 
     toolCallTimestamps.push(startTime);
 
+    logger.info("tool", `Tool call started`, {
+      operation: name,
+      details: { args: sanitizeArgsForLogging(args) },
+    });
+
     try {
       const response = await handler(args);
+      const durationMs = Date.now() - startTime;
+
+      logger.info("tool", `Tool call completed successfully`, {
+        operation: name,
+        durationMs,
+        status: "success",
+        details: {
+          responsePreview:
+            response.length > 300 ? response.slice(0, 300) + "..." : response,
+        },
+      });
+
       return {
         content: [{ type: "text", text: response }],
       };
     } catch (error: unknown) {
+      const durationMs = Date.now() - startTime;
+
       if (error instanceof DynatraceApiError) {
-        let additionalInfo = "";
-        if (error.status === 403) {
-          additionalInfo =
-            " Note: Your user is most likely lacking the necessary permissions/scopes for this API Call.";
-        }
+        logger.error("tool", `Dynatrace API error in tool`, {
+          operation: name,
+          durationMs,
+          status: "error",
+          details: {
+            httpStatus: error.status,
+            apiError: error.message,
+            body: error.body.slice(0, 500),
+          },
+        });
         return {
           content: [
             {
               type: "text",
-              text: `Dynatrace API Error: ${error.message} (HTTP ${error.status}).${additionalInfo} Body: ${error.body}`,
+              text: `Dynatrace API Error: ${error.message} (HTTP ${error.status}). Body: ${error.body}`,
             },
           ],
           isError: true,
@@ -135,7 +183,14 @@ function createToolHandler(
 
       const message =
         error instanceof Error ? error.message : String(error);
-      console.error(`Tool ${name} error:`, error);
+
+      logger.error("tool", `Tool call failed`, {
+        operation: name,
+        durationMs,
+        status: "error",
+        details: { error: message },
+      });
+
       return {
         content: [{ type: "text", text: `Error: ${message}` }],
         isError: true,
@@ -283,5 +338,7 @@ export function registerAllTools(
     ),
   );
 
-  console.error(`Registered 12 Dynatrace MCP tools.`);
+  logger.info("startup", "MCP tools registered", {
+    details: { count: 12 },
+  });
 }

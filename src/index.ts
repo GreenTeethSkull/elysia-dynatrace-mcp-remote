@@ -1,15 +1,9 @@
-/**
- * Entry point for the Elysia Dynatrace MCP Remote Server.
- *
- * This server runs as a remote MCP server via Streamable HTTP transport,
- * designed for containerized deployment.
- */
-
 import { createApp } from "./server";
 import { SERVER_NAME, SERVER_VERSION } from "./constants";
+import { logger } from "./services/logger";
 
 async function main() {
-  console.error(`Initializing ${SERVER_NAME} v${SERVER_VERSION}...`);
+  logger.info("startup", `Initializing ${SERVER_NAME} v${SERVER_VERSION}`);
 
   const app = await createApp();
 
@@ -18,14 +12,16 @@ async function main() {
 
   app.listen({ port, hostname: host });
 
-  console.error(`${SERVER_NAME} v${SERVER_VERSION} is running!`);
-  console.error(`  MCP endpoint: http://${host}:${port}/mcp`);
-  console.error(`  Health check: http://${host}:${port}/health`);
-  console.error(`  Server info:  http://${host}:${port}/`);
+  logger.info("startup", `${SERVER_NAME} v${SERVER_VERSION} is running`, {
+    details: {
+      mcpEndpoint: `http://${host}:${port}/mcp`,
+      healthCheck: `http://${host}:${port}/health`,
+      serverInfo: `http://${host}:${port}/`,
+    },
+  });
 
-  // Graceful shutdown
   const shutdown = () => {
-    console.error("Shutting down MCP server...");
+    logger.info("startup", "Shutting down MCP server");
     app.stop();
     process.exit(0);
   };
@@ -35,6 +31,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  logger.error("startup", "Fatal error during startup", {
+    details: { error: error instanceof Error ? error.message : String(error) },
+  });
   process.exit(1);
 });

@@ -1,12 +1,10 @@
 /**
  * Dynatrace HTTP Client for making authenticated API calls.
  * Uses Platform Token authentication via Bearer token.
- *
- * This is a lightweight replacement for the @dynatrace-sdk/http-client
- * that works with Bun's native fetch without Node.js dependencies.
  */
 
 import { SERVER_NAME, SERVER_VERSION, REQUEST_TIMEOUT_MS } from "../constants";
+import { logger } from "./logger";
 
 export interface DynatraceClientConfig {
   environmentUrl: string;
@@ -25,7 +23,6 @@ export class DynatraceClient {
   private readonly userAgent: string;
 
   constructor(config: DynatraceClientConfig) {
-    // Remove trailing slash from environment URL
     this.baseUrl = config.environmentUrl.replace(/\/$/, "");
     this.token = config.platformToken;
     this.userAgent = `${SERVER_NAME}/v${SERVER_VERSION} (${process.platform}-${process.arch})`;
@@ -46,6 +43,7 @@ export class DynatraceClient {
     const { method = "GET", body, headers = {}, timeout = REQUEST_TIMEOUT_MS } = options;
 
     const url = `${this.baseUrl}${path}`;
+    const startTime = Date.now();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -64,8 +62,22 @@ export class DynatraceClient {
         signal: controller.signal,
       });
 
+      const durationMs = Date.now() - startTime;
+
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
+
+        logger.error("http", `Dynatrace API error`, {
+          operation: `${method} ${path}`,
+          durationMs,
+          status: "error",
+          details: {
+            httpStatus: response.status,
+            statusText: response.statusText,
+            body: errorBody.slice(0, 500),
+          },
+        });
+
         throw new DynatraceApiError(
           `Dynatrace API error: ${response.status} ${response.statusText}`,
           response.status,
@@ -74,7 +86,33 @@ export class DynatraceClient {
       }
 
       const data = (await response.json()) as T;
+
+      logger.info("http", `Dynatrace API call completed`, {
+        operation: `${method} ${path}`,
+        durationMs,
+        status: "success",
+        details: { httpStatus: response.status },
+      });
+
       return { data, status: response.status, headers: response.headers };
+    } catch (error: unknown) {
+      const durationMs = Date.now() - startTime;
+
+      if (error instanceof DynatraceApiError) {
+        throw error;
+      }
+
+      const errMsg =
+        error instanceof Error ? error.message : String(error);
+
+      logger.error("http", `Dynatrace API call failed`, {
+        operation: `${method} ${path}`,
+        durationMs,
+        status: "error",
+        details: { error: errMsg },
+      });
+
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }
