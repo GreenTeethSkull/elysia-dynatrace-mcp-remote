@@ -12,10 +12,16 @@ import {
 import { SERVER_NAME, SERVER_VERSION } from "../constants";
 import { logger } from "./logger";
 
+export interface FilterSegment {
+  id: string;
+  variables?: Array<Record<string, unknown>>;
+}
+
 export interface DqlExecuteRequest {
   query: string;
   maxResultRecords?: number;
   maxResultBytes?: number;
+  filterSegments?: FilterSegment[];
 }
 
 export interface DqlVerifyResponse {
@@ -166,7 +172,7 @@ export async function verifyDqlStatement(
 
 /**
  * Execute a DQL statement against the Dynatrace GRAIL API.
- * Supports polling for long-running queries.
+ * Supports polling for long-running queries and optional filter segments.
  */
 export async function executeDql(
   client: DynatraceClient,
@@ -196,14 +202,16 @@ export async function executeDql(
     }
   }
 
-  logger.info("dql", "Executing DQL query", {
-    operation: "execute_dql",
-    details: {
-      dqlPreview: body.query.slice(0, 300),
-      maxResultRecords: body.maxResultRecords,
-      maxResultBytes: body.maxResultBytes,
-    },
-  });
+  // Build request payload
+  const payload: Record<string, unknown> = {
+    query: body.query,
+    maxResultRecords: body.maxResultRecords,
+    maxResultBytes: body.maxResultBytes,
+  };
+
+  if (body.filterSegments && body.filterSegments.length > 0) {
+    payload.filterSegments = body.filterSegments;
+  }
 
   // Execute the query
   const response = await client.post<{
@@ -212,11 +220,7 @@ export async function executeDql(
     state?: string;
   }>(
     "/platform/storage/query/v1/query:execute",
-    {
-      query: body.query,
-      maxResultRecords: body.maxResultRecords,
-      maxResultBytes: body.maxResultBytes,
-    },
+    payload,
     { "dt-client-context": userAgent },
   );
 

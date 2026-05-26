@@ -1,6 +1,6 @@
 # Dynatrace MCP Server (ElysiaJS + Bun)
 
-Servidor MCP (Model Context Protocol) remoto para Dynatrace, construido con ElysiaJS y Bun. Expone herramientas para consultar métricas de aplicación, ejecutar queries DQL, buscar problemas, obtener información del entorno y más.
+Servidor MCP (Model Context Protocol) remoto para Dynatrace, construido con ElysiaJS y Bun. Expone herramientas para consultar métricas de aplicación, ejecutar queries DQL, buscar problemas, obtener información del entorno, consultar métricas de APIs y más.
 
 ## Características
 
@@ -9,19 +9,20 @@ Servidor MCP (Model Context Protocol) remoto para Dynatrace, construido con Elys
 - **ElysiaJS**: Framework web ultrarrápido y minimalista
 - **Rate Limiting**: Protección contra abusos (5 llamadas por minuto)
 - **Grail Budget Tracker**: Control de consumo de queries DQL en GRAIL
+- **Filter Segments**: Soporte para filtrar queries DQL por segmentos de Dynatrace
 - **Docker Ready**: Despliegue contenedorizado listo para producción
 
 ## Herramientas Disponibles
 
-El servidor expone las siguientes 12 herramientas (tools) MCP:
+El servidor expone las siguientes 14 herramientas (tools) MCP:
 
 | Herramienta | Descripción |
 |-------------|-------------|
-| `get_environment_info` | Obtiene información del entorno de Dynatrace incluyendo versión,cluster ID, y configuraciones relevantes. |
+| `get_environment_info` | Obtiene información del entorno de Dynatrace incluyendo versión, cluster ID, y configuraciones relevantes. |
 | `list_problems` | Lista problemas (Davis problems) de Dynatrace con filtros por estado, prioridad y timeframe. |
 | `find_entity_by_name` | Busca entidades por nombre para obtener su ID y tipo. Ideal para filtrar queries DQL. |
 | `verify_dql` | Verifica sintácticamente una sentencia DQL antes de ejecutarla. |
-| `execute_dql` | Ejecuta queries DQL en GRAIL para obtener logs, métricas, eventos, trazas y datos de entidades. |
+| `execute_dql` | Ejecuta queries DQL en GRAIL para obtener logs, métricas, eventos, trazas y datos de entidades. Soporta filtrado por segmentos. |
 | `generate_dql_from_natural_language` | Genera queries DQL a partir de descripciones en lenguaje natural. |
 | `explain_dql_in_natural_language` | Explica queries DQL en lenguaje natural para facilitar su comprensión. |
 | `workload_details` | Obtiene detalles de workloads de Kubernetes incluyendo servicios, pods y métricas de rendimiento. |
@@ -29,6 +30,8 @@ El servidor expone las siguientes 12 herramientas (tools) MCP:
 | `get_kubernetes_events` | Recupera eventos de clusters Kubernetes monitorizados por Dynatrace. |
 | `list_exceptions` | Lista excepciones capturadas por Dynatrace OneAgent. |
 | `get_application_metrics` | Obtiene métricas de aplicación incluyendo disponibilidad, latencia, MTTR, errores, volumetría y métricas ponderadas. |
+| `get_api_info` | Obtiene métricas de una API específica (volumen, response time, errores, disponibilidad) y opcionalmente su backend, tribu y squad. Soporta filtrado por segmentos. |
+| `list_apis_summary` | Lista todas las APIs con métricas individuales en formato tabular. Permite filtrar por segmento o patrón de aplicación. |
 
 ## Requisitos Previos
 

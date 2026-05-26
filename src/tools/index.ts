@@ -79,6 +79,18 @@ import {
   getApplicationMetricsDescription,
   handleGetApplicationMetrics,
 } from "./application-metrics";
+import {
+  getApiInfoSchema,
+  getApiInfoAnnotations,
+  getApiInfoDescription,
+  handleGetApiInfo,
+} from "./api-info";
+import {
+  listApisSummarySchema,
+  listApisSummaryAnnotations,
+  listApisSummaryDescription,
+  handleListApisSummary,
+} from "./api-list";
 
 // Rate limiting state
 let toolCallTimestamps: number[] = [];
@@ -338,7 +350,27 @@ export function registerAllTools(
     ),
   );
 
-  logger.info("startup", "MCP tools registered", {
-    details: { count: 12 },
-  });
+  // get_api_info
+  server.tool(
+    "get_api_info",
+    getApiInfoDescription,
+    getApiInfoSchema,
+    getApiInfoAnnotations,
+    createToolHandler("get_api_info", (args) =>
+      handleGetApiInfo(client, args, grailBudgetGB),
+    ),
+  );
+
+    // list_apis_summary
+  server.tool(
+    "list_apis_summary",
+    listApisSummaryDescription,
+    listApisSummarySchema,
+    listApisSummaryAnnotations,
+    createToolHandler("list_apis_summary", (args) =>
+      handleListApisSummary(client, args, grailBudgetGB),
+    ),
+  );
+
+  console.error(`Registered 14 Dynatrace MCP tools.`);
 }
