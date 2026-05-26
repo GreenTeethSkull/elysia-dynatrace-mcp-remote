@@ -20,7 +20,7 @@ import { SERVER_NAME, SERVER_VERSION } from "./constants";
 import { DynatraceClient } from "./services/dynatrace-client";
 import { getDynatraceEnv } from "./services/dynatrace-env";
 import { registerAllTools } from "./tools";
-import { log } from "./services/logger";
+import { logger } from "./services/logger";
 
 /**
  * Creates and configures the ElysiaJS application with MCP transport.
@@ -36,19 +36,19 @@ export async function createApp() {
   });
 
   // ── 3. Test connection to Dynatrace ──
-  console.error(
-    `Testing connection to Dynatrace environment: ${env.dtEnvironment}...`,
-  );
+  logger.info("startup", `Testing connection to Dynatrace environment`, {
+    details: { environmentUrl: env.dtEnvironment },
+  });
   const connectionTest = await dtClient.testConnection();
   if (!connectionTest.success) {
-    console.error(
-      `Failed to connect to Dynatrace: ${connectionTest.error}`,
-    );
+    logger.error("startup", "Failed to connect to Dynatrace", {
+      details: { error: connectionTest.error },
+    });
     process.exit(2);
   }
-  console.error(
-    `Successfully connected to the Dynatrace environment at ${env.dtEnvironment}.`,
-  );
+  logger.info("startup", "Successfully connected to Dynatrace environment", {
+    details: { environmentUrl: env.dtEnvironment },
+  });
 
   // ── 4. Create McpServer and register tools ──
   const mcpServer = new McpServer(
@@ -91,9 +91,12 @@ export async function createApp() {
 
     // ── Request logging ──
     .onRequest(({ request }) => {
-      log("debug", "incoming request", {
-        method: request.method,
-        url: request.url,
+      logger.info("mcp", "incoming request", {
+        operation: `${request.method} ${new URL(request.url).pathname}`,
+        details: {
+          method: request.method,
+          url: request.url,
+        },
       });
     })
 
@@ -121,6 +124,8 @@ export async function createApp() {
     // ── MCP Endpoint: POST /mcp ──
     // Each POST creates a new stateless StreamableHTTPServerTransport
     .post("/mcp", async ({ request, set }) => {
+      const mcpStartTime = Date.now();
+
       // Read the raw body
       const rawBody = await request.text();
 
@@ -129,12 +134,27 @@ export async function createApp() {
         body = JSON.parse(rawBody);
       } catch {
         set.status = 400;
+        logger.error("mcp", "Invalid JSON in MCP request", {
+          operation: "POST /mcp",
+          status: "error",
+        });
         return {
           jsonrpc: "2.0",
           id: null,
           error: { code: -32700, message: "Parse error: Invalid JSON" },
         };
       }
+
+      // Extract method name from JSON-RPC body for logging
+      const rpcMethod =
+        body && typeof body === "object" && "method" in body
+          ? (body as Record<string, unknown>).method
+          : undefined;
+
+      logger.info("mcp", `MCP request received`, {
+        operation: `POST /mcp`,
+        details: { method: rpcMethod },
+      });
 
       // Create a stateless HTTP transport for each request
       const transport = new StreamableHTTPServerTransport({
@@ -260,7 +280,17 @@ export async function createApp() {
             body,
           );
         } catch (error) {
-          console.error("MCP transport error:", error);
+          const errMsg =
+            error instanceof Error ? error.message : String(error);
+          logger.error("mcp", "MCP transport error", {
+            operation: `POST /mcp`,
+            status: "error",
+            durationMs: Date.now() - mcpStartTime,
+            details: {
+              method: rpcMethod,
+              error: errMsg,
+            },
+          });
           set.status = 500;
           resolve({
             jsonrpc: "2.0",
@@ -268,6 +298,11 @@ export async function createApp() {
             error: { code: -32603, message: "Internal error" },
           });
         } finally {
+          logger.info("mcp", "MCP request completed", {
+            operation: `POST /mcp`,
+            durationMs: Date.now() - mcpStartTime,
+            details: { method: rpcMethod },
+          });
           // Cleanup: close transport after response is sent
           transport.close().catch(() => { });
           mcpServer.close().catch(() => { });

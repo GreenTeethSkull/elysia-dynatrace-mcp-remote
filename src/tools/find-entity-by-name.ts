@@ -6,6 +6,7 @@ import {
   DYNATRACE_ENTITY_TYPES_BASICS,
   getEntityTypeFromId,
 } from "../utils/entity-types";
+import { logger } from "../services/logger";
 
 export const findEntityByNameSchema = {
   entityNames: z
@@ -103,7 +104,9 @@ export async function handleFindEntityByName(
       return resp;
     }
   } catch {
-    console.error("Smartscape search failed, falling back to classic entities");
+    logger.warn("tool", "Smartscape search failed, falling back to classic entities", {
+      operation: "find_entity_by_name",
+    });
   }
 
   // Fallback to classic entities API
