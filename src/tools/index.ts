@@ -123,7 +123,6 @@ function createToolHandler(
   return async (args: any): Promise<CallToolResult> => {
     const startTime = Date.now();
 
-    // Rate limiting: max N calls per window
     const windowStart = startTime - RATE_LIMIT_WINDOW_MS;
     toolCallTimestamps = toolCallTimestamps.filter((ts) => ts > windowStart);
 
@@ -137,7 +136,7 @@ function createToolHandler(
         content: [
           {
             type: "text",
-            text: "Rate limit exceeded: Maximum 5 tool calls per 60 seconds. Please try again later.",
+            text: `Rate limit exceeded: Maximum ${RATE_LIMIT_MAX_CALLS} tool calls per ${RATE_LIMIT_WINDOW_MS / 1000} seconds. Please try again later.`,
           },
         ],
         isError: true,

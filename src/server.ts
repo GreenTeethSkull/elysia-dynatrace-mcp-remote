@@ -22,6 +22,28 @@ import { getDynatraceEnv } from "./services/dynatrace-env";
 import { registerAllTools } from "./tools";
 import { logger } from "./services/logger";
 
+function createMcpServer(
+  dtClient: DynatraceClient,
+  dtEnvironment: string,
+  grailBudgetGB: number,
+): McpServer {
+  const server = new McpServer(
+    {
+      name: "Dynatrace MCP Server (Elysia)",
+      version: SERVER_VERSION,
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    },
+  );
+
+  registerAllTools(server, dtClient, dtEnvironment, grailBudgetGB);
+
+  return server;
+}
+
 /**
  * Creates and configures the ElysiaJS application with MCP transport.
  */
@@ -50,27 +72,7 @@ export async function createApp() {
     details: { environmentUrl: env.dtEnvironment },
   });
 
-  // ── 4. Create McpServer and register tools ──
-  const mcpServer = new McpServer(
-    {
-      name: "Dynatrace MCP Server (Elysia)",
-      version: SERVER_VERSION,
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    },
-  );
-
-  registerAllTools(
-    mcpServer,
-    dtClient,
-    env.dtEnvironment,
-    env.grailBudgetGB,
-  );
-
-  // ── 5. Build ElysiaJS app ──
+  // ── 4. Build ElysiaJS app ──
   const corsOrigin = process.env.CORS_ORIGIN || "*";
 
   const app = new Elysia({ aot: true })
@@ -122,9 +124,16 @@ export async function createApp() {
     }))
 
     // ── MCP Endpoint: POST /mcp ──
-    // Each POST creates a new stateless StreamableHTTPServerTransport
+    // Each POST creates a new McpServer + StreamableHTTPServerTransport (stateless)
     .post("/mcp", async ({ request, set }) => {
       const mcpStartTime = Date.now();
+
+      // Create a fresh McpServer per request to support concurrent requests
+      const mcpServer = createMcpServer(
+        dtClient,
+        env.dtEnvironment,
+        env.grailBudgetGB,
+      );
 
       // Read the raw body
       const rawBody = await request.text();

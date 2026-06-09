@@ -8,5 +8,5 @@ export const REQUEST_TIMEOUT_MS = 30_000;
 export const SESSION_TTL_MINUTES = 30;
 
 // Rate limiting
-export const RATE_LIMIT_MAX_CALLS = 5;
+export const RATE_LIMIT_MAX_CALLS = 60;
 export const RATE_LIMIT_WINDOW_MS = 60_000; // 60 seconds

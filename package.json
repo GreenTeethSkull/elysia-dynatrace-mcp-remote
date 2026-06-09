@@ -12,9 +12,9 @@
     "docker:run": "docker run -p 3000:3000 --env-file .env elysia-dynatrace-mcp-remote"
   },
   "dependencies": {
-    "elysia": "^1.2.0",
     "@elysiajs/cors": "^1.2.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
+    "elysia": "^1.2.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
